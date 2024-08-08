@@ -21,7 +21,7 @@ class PandaPIEnergyMeasurement:
         self.timeout_occurred = False
         pyRAPL.setup()
 
-    def run_command(self, command, timeout=8):
+    def run_command(self, command, timeout=1800):
         if not self.timeout_occurred:
             try:
                 process = subprocess.Popen(command, shell=True, preexec_fn=os.setsid)
@@ -39,7 +39,7 @@ class PandaPIEnergyMeasurement:
             time.sleep(5)
         print("System is idle. Ready to start measurement.")
 
-    def is_system_idle(self, cpu_threshold=5.0, memory_threshold=20.0):
+    def is_system_idle(self, cpu_threshold=1.0, memory_threshold=5.0):
         cpu_usage = psutil.cpu_percent(interval=1)
         memory = psutil.virtual_memory()
         memory_usage = memory.percent
@@ -80,45 +80,46 @@ class PandaPIEnergyMeasurement:
 
             print(f'Solving problem instance: {problem_file_name}')
 
-            @pyRAPL.measureit(number=1, output=csv_output)
+            @pyRAPL.measureit(number=30, output=csv_output)
             def Parsing():
-                print(f"\033[91m{'run_pandaPIparser'}\033[0m")
+                print(f"\033[91m{'Parsing'}\033[0m")
                 command = f"{self.pandaPIparser} {self.domain_file} {'../../' + problem_file} {parsed_file}"
                 return self.run_command(command)
 
-            @pyRAPL.measureit(number=1, output=csv_output)
-            def run_pandaPIgrounder():
-                print(f"\033[91m{'run_pandaPIgrounder'}\033[0m")
+            @pyRAPL.measureit(number=30, output=csv_output)
+            def Grounding():
+                print(f"\033[91m{'Grounding'}\033[0m")
                 command = f"{self.pandaPIgrounder} -q -i {parsed_file} {psas_file}"
                 return self.run_command(command)
 
-            @pyRAPL.measureit(number=1, output=csv_output)
-            def run_pandaPIengine():
-                print(f"\033[91m{'run_pandaPIengine'}\033[0m")
+            @pyRAPL.measureit(number=30, output=csv_output)
+            def Solving():
+                print(f"\033[91m{'Solving'}\033[0m")
                 command = f'{self.pandaPIengine} "--heuristic=lama(lazy=false;ha=false;lm=lmc;useLMOrd=false;h=add;search=gbfs)" {psas_file} >> {log_file}'
                 return self.run_command(command)
 
-            @pyRAPL.measureit(number=1, output=csv_output)
-            def run_pandaPIparser_convert():
+            @pyRAPL.measureit(number=30, output=csv_output)
+            def Plan_Verification():
+                print(f"\033[91m{'Plan_Verification'}\033[0m")
                 command = f"{self.pandaPIparser} -c {log_file} {plan_file}"
                 return self.run_command(command)
 
-            command_functions = [
-                run_pandaPIparser,
-                run_pandaPIgrounder,
-                run_pandaPIengine,
-                run_pandaPIparser_convert
+            phases = [
+                Parsing,
+                Grounding,
+                Solving,
+                Plan_Verification
             ]
 
             self.clean_system_and_wait()
-            for command_function in command_functions:
+            for phase in phases:
                 if self.timeout_occurred:
                     break
-                command_function()
+                phase()
                 self.clean_system_and_wait()
 
             if self.timeout_occurred:
-                self.write_timeout_csv(csv_filename, command_functions)
+                self.write_timeout_csv(csv_filename, phases)
             else:
                 csv_output.save()
             os.chdir('../')
