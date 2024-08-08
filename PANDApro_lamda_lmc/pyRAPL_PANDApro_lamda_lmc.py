@@ -81,7 +81,7 @@ class PandaPIEnergyMeasurement:
             print(f'Solving problem instance: {problem_file_name}')
 
             @pyRAPL.measureit(number=1, output=csv_output)
-            def run_pandaPIparser():
+            def Parsing():
                 print(f"\033[91m{'run_pandaPIparser'}\033[0m")
                 command = f"{self.pandaPIparser} {self.domain_file} {'../../' + problem_file} {parsed_file}"
                 return self.run_command(command)
